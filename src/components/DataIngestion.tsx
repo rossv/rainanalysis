@@ -3,8 +3,7 @@ import { useStore } from '@/store';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Upload, FileText, Loader2 } from 'lucide-react';
-import Papa from 'papaparse';
-import type { RainDataPoint } from '@/types';
+import { parseRainData } from '@/utils/rainfallParsing';
 import { cn } from '@/lib/utils'; // Keep this imports
 // import { parse } from 'date-fns'; // removed unused import
 
@@ -18,55 +17,16 @@ export function DataIngestion() {
 
         setIsParsing(true);
 
-        Papa.parse(file, {
-            header: true,
-            skipEmptyLines: true,
-            complete: (results) => {
-                const points: RainDataPoint[] = [];
-
-                // Heuristic to find correct columns if headers vary
-                // Expected: Timestamp, Value (or similar)
-                // For now, assume standard format or try to detect.
-                // Let's assume columns: "Timestamp" (ISO or various), "Value" (Inches)
-
-                results.data.forEach((row: any) => {
-                    // Try parsing timestamp
-                    let timestamp = 0;
-                    if (row.Timestamp || row.timestamp || row.Date || row.date) {
-                        const rawTime = row.Timestamp || row.timestamp || row.Date || row.date;
-                        // Attempt to parse string to timestamp
-                        const date = new Date(rawTime);
-                        if (!isNaN(date.getTime())) {
-                            timestamp = date.getTime();
-                        }
-                    }
-
-                    // Try parsing value
-                    let value = 0;
-                    if (row.Value !== undefined || row.value !== undefined || row.Rainfall !== undefined) {
-                        const rawVal = row.Value ?? row.value ?? row.Rainfall;
-                        value = parseFloat(rawVal);
-                    }
-
-                    if (timestamp > 0 && !isNaN(value)) {
-                        points.push({
-                            timestamp,
-                            value,
-                            sourceId: file.name
-                        });
-                    }
-                });
-
+        parseRainData(file)
+            .then((points) => {
                 addRainData(points);
                 setIsParsing(false);
-                // Reset input
                 e.target.value = '';
-            },
-            error: (error) => {
-                console.error("CSV Parse Error", error);
+            })
+            .catch((error) => {
+                console.error("Parse Error", error);
                 setIsParsing(false);
-            }
-        });
+            });
     }, [addRainData]);
 
     return (
@@ -79,7 +39,7 @@ export function DataIngestion() {
                 <div className="relative">
                     <input
                         type="file"
-                        accept=".csv"
+                        accept=".csv,.dat,.tsf"
                         onChange={handleFileUpload}
                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                         disabled={isParsing}
