@@ -29,8 +29,8 @@ export function segmentEvents(
             const lastPoint = currentEventPoints[currentEventPoints.length - 1];
             const timeDiff = point.timestamp - lastPoint.timestamp;
 
-            if (timeDiff > ietdMs) {
-                // Gap > IETD, finalize current event
+            if (timeDiff >= ietdMs) {
+                // Gap >= IETD, finalize current event
                 finalizeEvent(currentEventPoints, minEventThreshold, events);
                 // Start new event
                 currentEventPoints = [point];
