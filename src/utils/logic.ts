@@ -12,8 +12,10 @@ export function segmentEvents(
     ietdHours: number,
     minEventThreshold: number
 ): StormEvent[] {
+    const rainyData = data.filter((point) => point.value > 0);
+
     // 1. Sort data by timestamp just in case
-    const sortedData = [...data].sort((a, b) => a.timestamp - b.timestamp);
+    const sortedData = [...rainyData].sort((a, b) => a.timestamp - b.timestamp);
 
     const events: StormEvent[] = [];
     let currentEventPoints: RainDataPoint[] = [];

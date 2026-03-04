@@ -39,6 +39,25 @@ describe('Logic Utils', () => {
             expect(events.length).toBe(0);
         });
 
+
+
+        it('should ignore zero-depth points when segmenting events', () => {
+            const baseTime = new Date('2023-01-01T00:00:00Z').getTime();
+            const hour = 3600 * 1000;
+
+            const points: RainDataPoint[] = [
+                { timestamp: baseTime, value: 0.4, sourceId: '1' },
+                { timestamp: baseTime + 1 * hour, value: 0, sourceId: '1' },
+                { timestamp: baseTime + 2 * hour, value: 0, sourceId: '1' },
+                { timestamp: baseTime + 8 * hour, value: 0.6, sourceId: '1' },
+            ];
+
+            const events = segmentEvents(points, 6, 0);
+
+            expect(events.length).toBe(2);
+            expect(events[0].totalDepth).toBe(0.4);
+            expect(events[1].totalDepth).toBe(0.6);
+        });
         it('should split events when dry gap equals IETD', () => {
             const baseTime = new Date('2023-01-01T00:00:00Z').getTime();
             const hour = 3600 * 1000;
