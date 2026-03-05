@@ -95,6 +95,7 @@ function finalizeEvent(
  * @returns Object mapping duration string (e.g., "15min") to max depth (inches)
  */
 export function calculateRollingPeaks(points: RainDataPoint[]): { [duration: string]: number } {
+    const sortedPoints = [...points].sort((a, b) => a.timestamp - b.timestamp);
     const STANDARD_DURATIONS = [
         { label: "15min", ms: 15 * 60 * 1000 },
         { label: "1hr", ms: 60 * 60 * 1000 },
@@ -107,7 +108,7 @@ export function calculateRollingPeaks(points: RainDataPoint[]): { [duration: str
     const peaks: { [duration: string]: number } = {};
 
     STANDARD_DURATIONS.forEach(duration => {
-        peaks[duration.label] = getRollingMax(points, duration.ms);
+        peaks[duration.label] = getRollingMax(sortedPoints, duration.ms);
     });
 
     return peaks;

@@ -188,7 +188,7 @@ function parseSwmmTsf(lines: string[], sourceId: string): RainDataPoint[] {
       continue;
     }
 
-    const parts = trimmed.split(/\t+/);
+    const parts = trimmed.split(/\t+|\s{2,}/);
     if (parts.length < 2) {
       continue;
     }
