@@ -21,6 +21,23 @@ describe('rainfallParsing', () => {
     }
   });
 
+
+
+  it('parses tsf rows separated by spaces', () => {
+    const text = [
+      'IDs:	Station Rain',
+      'Date/Time	Rainfall',
+      'M/d/yyyy	in',
+      '3/1/2022 12:05:00 AM  0.1',
+      '3/1/2022 12:10:00 AM  0.0',
+    ].join('\n');
+
+    const parsed = parseRainDataText(text, 'space-separated.tsf', 'tsf');
+
+    expect(parsed).toHaveLength(2);
+    expect(parsed[0].value).toBe(0.1);
+  });
+
   it('parses headerless timestamp,value csv', () => {
     const text = ['2025/11/01 00:05,0.0', '2025/11/01 00:10,0.1', '2025/11/01 00:15,0.2'].join('\n');
 

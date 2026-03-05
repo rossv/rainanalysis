@@ -120,6 +120,21 @@ describe('Logic Utils', () => {
         });
     });
 
+
+
+        it('should produce the same peaks for unsorted input points', () => {
+            const min = 60 * 1000;
+            const sortedPoints: RainDataPoint[] = [
+                { timestamp: 0, value: 0.4, sourceId: '1' },
+                { timestamp: 15 * min, value: 0.2, sourceId: '1' },
+                { timestamp: 30 * min, value: 0.3, sourceId: '1' },
+            ];
+
+            const unsortedPoints = [sortedPoints[2], sortedPoints[0], sortedPoints[1]];
+
+            expect(calculateRollingPeaks(unsortedPoints)).toEqual(calculateRollingPeaks(sortedPoints));
+        });
+
     describe('appendData', () => {
         it('should deduplicate based on timestamp', () => {
             const existing: RainDataPoint[] = [
