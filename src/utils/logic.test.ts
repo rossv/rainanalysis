@@ -38,6 +38,37 @@ describe('Logic Utils', () => {
             const events = segmentEvents(points, 6, 0.1);
             expect(events.length).toBe(0);
         });
+
+        it('should correctly segment events even if continuous zero-value points exist', () => {
+            const baseTime = new Date('2023-01-01T00:00:00Z').getTime();
+            const min = 60 * 1000;
+
+            // Event 1: 30 minutes of rain
+            const points: RainDataPoint[] = [
+                { timestamp: baseTime, value: 0.5, sourceId: '1' },
+                { timestamp: baseTime + 15 * min, value: 0.5, sourceId: '1' },
+                { timestamp: baseTime + 30 * min, value: 0.5, sourceId: '1' },
+            ];
+
+            // Continuous data but with 0 values for 8 hours (Gap > 6hr IETD)
+            for (let i = 1; i <= 32; i++) { // 32 * 15min = 8 hours
+                points.push({ timestamp: baseTime + 30 * min + i * 15 * min, value: 0, sourceId: '1' });
+            }
+
+            // Event 2: Start after the 8-hour gap
+            const event2Start = baseTime + 30 * min + 33 * 15 * min;
+            points.push({ timestamp: event2Start, value: 0.5, sourceId: '1' });
+            points.push({ timestamp: event2Start + 15 * min, value: 0.5, sourceId: '1' });
+
+            const ietd = 6; // 6 hours
+            const threshold = 0.1;
+            const events = segmentEvents(points, ietd, threshold);
+
+            // Expect 2 events, not 1.
+            expect(events.length).toBe(2);
+            expect(events[0].totalDepth).toBe(1.5);
+            expect(events[1].totalDepth).toBe(1.0);
+        });
     });
 
     describe('calculateRollingPeaks', () => {
