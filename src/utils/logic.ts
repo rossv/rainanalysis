@@ -16,6 +16,10 @@ export function segmentEvents(
     const sortedData = [...data]
         .filter(p => p.value > 0)
         .sort((a, b) => a.timestamp - b.timestamp);
+    const rainyData = data.filter((point) => point.value > 0);
+
+    // 1. Sort data by timestamp just in case
+    const sortedData = [...rainyData].sort((a, b) => a.timestamp - b.timestamp);
 
     const events: StormEvent[] = [];
     let currentEventPoints: RainDataPoint[] = [];
@@ -31,8 +35,8 @@ export function segmentEvents(
             const lastPoint = currentEventPoints[currentEventPoints.length - 1];
             const timeDiff = point.timestamp - lastPoint.timestamp;
 
-            if (timeDiff > ietdMs) {
-                // Gap > IETD, finalize current event
+            if (timeDiff >= ietdMs) {
+                // Gap >= IETD, finalize current event
                 finalizeEvent(currentEventPoints, minEventThreshold, events);
                 // Start new event
                 currentEventPoints = [point];
@@ -95,6 +99,7 @@ function finalizeEvent(
  * @returns Object mapping duration string (e.g., "15min") to max depth (inches)
  */
 export function calculateRollingPeaks(points: RainDataPoint[]): { [duration: string]: number } {
+    const sortedPoints = [...points].sort((a, b) => a.timestamp - b.timestamp);
     const STANDARD_DURATIONS = [
         { label: "15min", ms: 15 * 60 * 1000 },
         { label: "1hr", ms: 60 * 60 * 1000 },
@@ -107,7 +112,7 @@ export function calculateRollingPeaks(points: RainDataPoint[]): { [duration: str
     const peaks: { [duration: string]: number } = {};
 
     STANDARD_DURATIONS.forEach(duration => {
-        peaks[duration.label] = getRollingMax(points, duration.ms);
+        peaks[duration.label] = getRollingMax(sortedPoints, duration.ms);
     });
 
     return peaks;

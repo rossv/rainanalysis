@@ -69,6 +69,41 @@ describe('Logic Utils', () => {
             expect(events[0].totalDepth).toBe(1.5);
             expect(events[1].totalDepth).toBe(1.0);
         });
+
+
+
+        it('should ignore zero-depth points when segmenting events', () => {
+            const baseTime = new Date('2023-01-01T00:00:00Z').getTime();
+            const hour = 3600 * 1000;
+
+            const points: RainDataPoint[] = [
+                { timestamp: baseTime, value: 0.4, sourceId: '1' },
+                { timestamp: baseTime + 1 * hour, value: 0, sourceId: '1' },
+                { timestamp: baseTime + 2 * hour, value: 0, sourceId: '1' },
+                { timestamp: baseTime + 8 * hour, value: 0.6, sourceId: '1' },
+            ];
+
+            const events = segmentEvents(points, 6, 0);
+
+            expect(events.length).toBe(2);
+            expect(events[0].totalDepth).toBe(0.4);
+            expect(events[1].totalDepth).toBe(0.6);
+        });
+        it('should split events when dry gap equals IETD', () => {
+            const baseTime = new Date('2023-01-01T00:00:00Z').getTime();
+            const hour = 3600 * 1000;
+
+            const points: RainDataPoint[] = [
+                { timestamp: baseTime, value: 0.5, sourceId: '1' },
+                { timestamp: baseTime + 6 * hour, value: 0.5, sourceId: '1' },
+            ];
+
+            const events = segmentEvents(points, 6, 0);
+
+            expect(events.length).toBe(2);
+            expect(events[0].totalDepth).toBe(0.5);
+            expect(events[1].totalDepth).toBe(0.5);
+        });
     });
 
     describe('calculateRollingPeaks', () => {
@@ -114,6 +149,21 @@ describe('Logic Utils', () => {
             // Max should be 0.5.
             expect(peaks['15min']).toBe(0.5);
         });
+    });
+
+
+
+    it('should produce the same peaks for unsorted input points', () => {
+        const min = 60 * 1000;
+        const sortedPoints: RainDataPoint[] = [
+            { timestamp: 0, value: 0.4, sourceId: '1' },
+            { timestamp: 15 * min, value: 0.2, sourceId: '1' },
+            { timestamp: 30 * min, value: 0.3, sourceId: '1' },
+        ];
+
+        const unsortedPoints = [sortedPoints[2], sortedPoints[0], sortedPoints[1]];
+
+        expect(calculateRollingPeaks(unsortedPoints)).toEqual(calculateRollingPeaks(sortedPoints));
     });
 
     describe('appendData', () => {
