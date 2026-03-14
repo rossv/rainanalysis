@@ -1,73 +1,95 @@
-# React + TypeScript + Vite
+# RainCheck
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+RainCheck is a browser-based rainfall analysis tool for exploring rain gauge data, splitting it into storm events, and reviewing event metrics for engineering workflows.
 
-Currently, two official plugins are available:
+## What It Does
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- Upload rainfall files (`.csv`, `.dat`, `.tsf`) directly in the UI.
+- Parse and normalize timestamp/value records.
+- Segment rainfall into events using an Inter-Event Time Definition (IETD).
+- Filter low-depth events with a minimum event depth threshold.
+- Visualize rainfall as a timeline chart and review event details in a table.
+- Track summary metrics such as total rainfall, event count, and largest event.
 
-## React Compiler
+## Supported Input Formats
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### CSV
 
-## Expanding the ESLint configuration
+RainCheck accepts a range of CSV layouts, including:
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+- Column-based date parts: `Year`, `Month`, `Day`, `Hour`, `Minute` plus a rain value column (`Rain(inch)`, `Rain`, or `Value`)
+- Timestamp/value style columns (header names containing `date`, `time`, `timestamp`, `value`, `rain`, or `depth`)
+- Headerless timestamp/value rows as a fallback
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+### SWMM-style DAT
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+- Lines beginning with `;` are treated as comments
+- Expected data layout is whitespace-delimited and includes date/time parts plus rainfall value
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### SWMM-style TSF
+
+- Header rows such as `IDs:`, `Date/Time`, and `M/d/yyyy` are ignored
+- Data rows are parsed as datetime + rainfall value (tab or multi-space delimited)
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 20+ recommended
+- npm 10+ recommended
+
+### Install
+
+```bash
+npm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### Run Locally
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm run dev
 ```
+
+Then open the local Vite URL shown in terminal output (typically `http://localhost:5173`).
+
+### Build for Production
+
+```bash
+npm run build
+```
+
+### Preview Production Build
+
+```bash
+npm run preview
+```
+
+### Lint
+
+```bash
+npm run lint
+```
+
+## Typical Workflow
+
+1. Start the app with `npm run dev`.
+2. Load a rainfall file from the **Data Sources** panel.
+3. Tune **Inter-Event Time (Hours)** and **Min Event Depth (in)** in **Analysis Settings**.
+4. Review summary cards, the timeline chart, and the identified events table.
+5. Clear data and repeat with additional files as needed.
+
+## Sample Files
+
+Example datasets are included in the [`examples`](./examples) folder for quick testing.
+
+## Project Structure
+
+- `src/components`: UI and feature components (`Dashboard`, `DataIngestion`, `SettingsPanel`, etc.)
+- `src/utils/rainfallParsing.ts`: File parsing and normalization logic
+- `src/utils/logic.ts`: Event segmentation and rolling peak calculations
+- `src/store.ts`: Global application state (settings, loaded points, computed events)
+
+## Current Limitations
+
+- Return period tagging is currently placeholder-only (`N/A`) and not linked to IDF curves yet.
+- Very large datasets may impact chart performance without aggregation/downsampling.

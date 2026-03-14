@@ -22,3 +22,12 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Temporary/test artifacts
+*.tmp
+*.temp
+*.bak
+*.orig
+*.rej
+*.tsbuildinfo
+coverage
