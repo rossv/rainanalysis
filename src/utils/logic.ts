@@ -12,14 +12,10 @@ export function segmentEvents(
     ietdHours: number,
     minEventThreshold: number
 ): StormEvent[] {
-    // 1. Sort data by timestamp and filter out zero-value points
+    // 1. Sort data by timestamp and ignore dry points for IETD gap checks
     const sortedData = [...data]
-        .filter(p => p.value > 0)
+        .filter((point) => point.value > 0)
         .sort((a, b) => a.timestamp - b.timestamp);
-    const rainyData = data.filter((point) => point.value > 0);
-
-    // 1. Sort data by timestamp just in case
-    const sortedData = [...rainyData].sort((a, b) => a.timestamp - b.timestamp);
 
     const events: StormEvent[] = [];
     let currentEventPoints: RainDataPoint[] = [];
