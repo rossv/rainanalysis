@@ -1,18 +1,22 @@
 import type { RainDataPoint, StormEvent } from '../types';
+import type { IDFRegion } from './idf';
+import { calcRecurrenceIntervals } from './idf';
 
 /**
  * Segments rainfall data into storm events based on the Inter-Event Time Definition (IETD).
  * @param data Array of RainDataPoint
  * @param ietdHours The minimum dry period in hours to separate events
  * @param minEventThreshold The minimum total depth (inches) for an event to be included
+ * @param idfRegion Optional IDF region for return period estimation
  * @returns Array of StormEvent
  */
 export function segmentEvents(
     data: RainDataPoint[],
     ietdHours: number,
-    minEventThreshold: number
+    minEventThreshold: number,
+    idfRegion?: IDFRegion
 ): StormEvent[] {
-    // 1. Sort data by timestamp and ignore dry points for IETD gap checks
+    // Sort data by timestamp and ignore dry points for IETD gap checks
     const sortedData = [...data]
         .filter((point) => point.value > 0)
         .sort((a, b) => a.timestamp - b.timestamp);
@@ -32,20 +36,16 @@ export function segmentEvents(
             const timeDiff = point.timestamp - lastPoint.timestamp;
 
             if (timeDiff >= ietdMs) {
-                // Gap >= IETD, finalize current event
-                finalizeEvent(currentEventPoints, minEventThreshold, events);
-                // Start new event
+                finalizeEvent(currentEventPoints, minEventThreshold, events, idfRegion);
                 currentEventPoints = [point];
             } else {
-                // Gap <= IETD, continue event
                 currentEventPoints.push(point);
             }
         }
     }
 
-    // Finalize last event
     if (currentEventPoints.length > 0) {
-        finalizeEvent(currentEventPoints, minEventThreshold, events);
+        finalizeEvent(currentEventPoints, minEventThreshold, events, idfRegion);
     }
 
     return events;
@@ -54,27 +54,29 @@ export function segmentEvents(
 function finalizeEvent(
     points: RainDataPoint[],
     threshold: number,
-    events: StormEvent[]
+    events: StormEvent[],
+    idfRegion?: IDFRegion
 ) {
     const totalDepth = points.reduce((sum, p) => sum + p.value, 0);
 
-    // Filter based on total depth threshold
     if (totalDepth < threshold) {
         return;
     }
 
     const startDate = new Date(points[0].timestamp);
     const endDate = new Date(points[points.length - 1].timestamp);
-
-    // Calculate peaks
     const peakIntensities = calculateRollingPeaks(points);
 
-    // Recurrance intervals and max return period logic to be implemented later
-    // Or handled outside if IDF curves are needed.
-    // For now, we return placeholders or pass IDF object if available.
-    // The requirement says "Assign a 'Return Period' tag... based on worst-case duration found."
-    // But IDF JSON is needed for that. The function signature didn't include it.
-    // We can leave `recurrenceIntervals` and `maxReturnPeriod` empty/mocked here, and update them separately.
+    let recurrenceIntervals: { [duration: string]: string } = {};
+    let maxReturnPeriod = 'N/A';
+    let maxReturnPeriodYears = 0;
+
+    if (idfRegion) {
+        const result = calcRecurrenceIntervals(peakIntensities, idfRegion);
+        recurrenceIntervals = result.recurrenceIntervals;
+        maxReturnPeriod = result.maxReturnPeriod;
+        maxReturnPeriodYears = result.maxReturnPeriodYears;
+    }
 
     const stormEvent: StormEvent = {
         id: crypto.randomUUID(),
@@ -82,27 +84,28 @@ function finalizeEvent(
         endDate,
         totalDepth,
         peakIntensities,
-        recurrenceIntervals: {}, // To be populated
-        maxReturnPeriod: "N/A", // To be populated
+        recurrenceIntervals,
+        maxReturnPeriod,
+        maxReturnPeriodYears,
     };
 
     events.push(stormEvent);
 }
 
 /**
- * Calculates rolling maximum rainfall sums for standard durations.
+ * Calculates rolling maximum rainfall depths for standard durations.
+ * Returns depth (inches) accumulated within each duration window.
  * @param points Array of RainDataPoint for a single event
- * @returns Object mapping duration string (e.g., "15min") to max depth (inches)
  */
 export function calculateRollingPeaks(points: RainDataPoint[]): { [duration: string]: number } {
     const sortedPoints = [...points].sort((a, b) => a.timestamp - b.timestamp);
     const STANDARD_DURATIONS = [
-        { label: "15min", ms: 15 * 60 * 1000 },
-        { label: "1hr", ms: 60 * 60 * 1000 },
-        { label: "2hr", ms: 2 * 60 * 60 * 1000 },
-        { label: "6hr", ms: 6 * 60 * 60 * 1000 },
-        { label: "12hr", ms: 12 * 60 * 60 * 1000 },
-        { label: "24hr", ms: 24 * 60 * 60 * 1000 },
+        { label: '15min', ms: 15 * 60 * 1000 },
+        { label: '1hr',  ms: 60 * 60 * 1000 },
+        { label: '2hr',  ms: 2 * 60 * 60 * 1000 },
+        { label: '6hr',  ms: 6 * 60 * 60 * 1000 },
+        { label: '12hr', ms: 12 * 60 * 60 * 1000 },
+        { label: '24hr', ms: 24 * 60 * 60 * 1000 },
     ];
 
     const peaks: { [duration: string]: number } = {};
@@ -119,41 +122,9 @@ function getRollingMax(points: RainDataPoint[], durationMs: number): number {
 
     let maxDepth = 0;
     let currentSum = 0;
-
-
-    // Since points are irregular, we can't just use a fixed window of indices.
-    // We use a sliding window based on time.
-    // BUT the 'value' is associated with a timestamp. Is it rainfall accumulated up to that timestamp? Or rainfall at that instant?
-    // Usually rain gauges record "tips" or accumulated over 15min intervals.
-    // If data is "15-min interval data", then point.value is rain in [t-15m, t].
-    // But here we have raw points. Let's assume point.value is rain that fell AT 'timestamp' (or just before).
-    // Time-based rolling sum: sum of values where t_start <= t <= t_start + duration.
-
-    // Algorithm:
-    // Iterate through all possible start times? No, start times are driven by data points?
-    // Or simply: For each window [t, t+duration], sum up points inside.
-    // The max sum generally starts near a data point.
-    // Let's use two pointers: left and right.
-    // Expand right until time[right] - time[left] > duration.
-    // Then shrink from left.
-
-    // Wait, if we want max distinct window? No, rolling implies any window.
-    // If data is point-based (tips), then sum of points in window.
-
     let left = 0;
-    let right = 0;
 
-    // To handle exact duration edge implementation correctly:
-    // A window of 1 hour starting at T includes points in [T, T + 1hr].
-    // Efficient algorithm:
-    // Iterate right from 0 to N-1.
-    // Update sum by adding points[right].
-    // While (points[right].timestamp - points[left].timestamp > durationMs), remove points[left] and increment left.
-    // Keep track of max sum.
-    // This finds max sum ending at 'right', with duration constraint.
-    // Is this covering all windows? Yes.
-
-    for (right = 0; right < points.length; right++) {
+    for (let right = 0; right < points.length; right++) {
         currentSum += points[right].value;
 
         while (points[right].timestamp - points[left].timestamp > durationMs) {
@@ -161,9 +132,6 @@ function getRollingMax(points: RainDataPoint[], durationMs: number): number {
             left++;
         }
 
-        // Check if current window actually spans close to duration? No, rolling max definition is "max depth in ANY X-hour period".
-        // Even if we have only 5 minutes of rain, it fits in 24-hr window.
-        // So simple max is correct.
         if (currentSum > maxDepth) {
             maxDepth = currentSum;
         }
@@ -173,22 +141,15 @@ function getRollingMax(points: RainDataPoint[], durationMs: number): number {
 }
 
 /**
- * Appends new data to existing dataset, removing duplicates based on timestamp.
+ * Appends new data to existing dataset, deduplicating on timestamp.
  */
 export function appendData(existing: RainDataPoint[], incoming: RainDataPoint[]): RainDataPoint[] {
     const existingMap = new Map<number, RainDataPoint>();
-
-    // Populate map
     existing.forEach(p => existingMap.set(p.timestamp, p));
-
-    // Add new points if timestamp not exists
     incoming.forEach(p => {
         if (!existingMap.has(p.timestamp)) {
             existingMap.set(p.timestamp, p);
         }
     });
-
-    // Convert back to array and sort
-    const merged = Array.from(existingMap.values()).sort((a, b) => a.timestamp - b.timestamp);
-    return merged;
+    return Array.from(existingMap.values()).sort((a, b) => a.timestamp - b.timestamp);
 }
